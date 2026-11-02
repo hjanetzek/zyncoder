@@ -24,6 +24,7 @@
 # ********************************************************************
 
 from ctypes import *
+import os
 from os.path import dirname, realpath
 #from numpy.ctypeslib import ndpointer
 
@@ -35,10 +36,18 @@ global lib_zyncore
 lib_zyncore = None
 
 
+def zyncore_lib_path():
+	"""libzyncore.so from ZYNTHIAN_LIB_DIR (installed package) if it's there, else from the build directory"""
+	lib_dir = os.environ.get("ZYNTHIAN_LIB_DIR", "")
+	if lib_dir and os.path.isfile(os.path.join(lib_dir, "libzyncore.so")):
+		return os.path.join(lib_dir, "libzyncore.so")
+	return dirname(realpath(__file__)) + "/build/libzyncore.so"
+
+
 def lib_zyncore_init():
 	global lib_zyncore
 	try:
-		lib_zyncore = cdll.LoadLibrary(dirname(realpath(__file__))+"/build/libzyncore.so")
+		lib_zyncore = cdll.LoadLibrary(zyncore_lib_path())
 		result = lib_zyncore.init_zyncore()
 	except Exception as e:
 		lib_zyncore = None
@@ -64,7 +73,7 @@ def lib_zyncore_init():
 def lib_zyncore_init_minimal():
 	global lib_zyncore
 	try:
-		lib_zyncore = cdll.LoadLibrary(dirname(realpath(__file__))+"/build/libzyncore.so")
+		lib_zyncore = cdll.LoadLibrary(zyncore_lib_path())
 		lib_zyncore.init_zyncore_minimal()
 
 	except Exception as e:
