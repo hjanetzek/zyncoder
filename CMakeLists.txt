@@ -7,6 +7,16 @@ include(CheckLibraryExists)
 
 link_directories(/usr/local/lib)
 
+# Without wiringPi (desktop Linux, non-Pi hardware), build a stand-in library
+# under the same name: no GPIO and no I2C devices, the rest of zyncore works.
+find_library(WIRINGPI_LIBRARY wiringPi)
+if (NOT WIRINGPI_LIBRARY)
+	message("++ wiringPi not found: building without GPIO/I2C support (wiringpi_stub)")
+	include_directories(BEFORE ${CMAKE_CURRENT_SOURCE_DIR}/wiringpi_stub)
+	add_library(wiringPi STATIC wiringpi_stub/wiringpi_stub.c)
+	set_target_properties(wiringPi PROPERTIES POSITION_INDEPENDENT_CODE ON)
+endif()
+
 if (("$ENV{ZYNTHIAN_WIRING_LAYOUT}" STREQUAL "MCP23017_ENCODERS")
  OR ("$ENV{ZYNTHIAN_WIRING_LAYOUT}" STREQUAL "MCP23017_ENCODERS_V5TOUCH")
  OR ("$ENV{ZYNTHIAN_WIRING_LAYOUT}" STREQUAL "MCP23017_EXTRA")
