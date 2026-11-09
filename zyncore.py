@@ -37,10 +37,18 @@ lib_zyncore = None
 
 
 def zyncore_lib_path():
-	"""libzyncore.so from ZYNTHIAN_LIB_DIR (installed package) if it's there, else from the build directory"""
+	"""libzyncore.so from ZYNTHIAN_LIB_DIR (installed package) if it's there, else from the build directory.
+	The kit's build (zyncoder-hw: ZYNTHIAN_LIB_DIR/hw/<ZYNTHIAN_WIRING_LAYOUT>/libzyncore.so, with the
+	kit's wiring compiled in) comes before the generic one."""
 	lib_dir = os.environ.get("ZYNTHIAN_LIB_DIR", "")
-	if lib_dir and os.path.isfile(os.path.join(lib_dir, "libzyncore.so")):
-		return os.path.join(lib_dir, "libzyncore.so")
+	if lib_dir:
+		layout = os.environ.get("ZYNTHIAN_WIRING_LAYOUT", "")
+		if layout and "/" not in layout:
+			path = os.path.join(lib_dir, "hw", layout, "libzyncore.so")
+			if os.path.isfile(path):
+				return path
+		if os.path.isfile(os.path.join(lib_dir, "libzyncore.so")):
+			return os.path.join(lib_dir, "libzyncore.so")
 	return dirname(realpath(__file__)) + "/build/libzyncore.so"
 
 
