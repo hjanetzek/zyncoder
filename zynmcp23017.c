@@ -349,16 +349,8 @@ void zyncoder_update_zynmcp23017(uint8_t i) {
 }
 
 
-// ISR for handling the mcp23017 interrupts
-void zynmcp23017_ISR(uint8_t i, uint8_t bank) {
-	if (i >= MAX_NUM_MCP23017) {
-		fprintf(stderr, "ZynCore->zynmcp23017_ISR(%d, %d): Invalid index!\n", i, bank);
-		return;
-	}
-	if (!zynmcp23017s[i].enabled) return;
-
-	//fprintf(stderr, "zyncoder_mcp23017_ISR(%d, %d)\n", i, bank);
-
+// Read one bank of an mcp23017 and process its pin changes (the ISR's work)
+static void zynmcp23017_read_bank(uint8_t i, uint8_t bank) {
 	uint16_t pin_offset;
 	uint16_t reg;
 	uint8_t rdiff;
@@ -406,6 +398,37 @@ void zynmcp23017_ISR(uint8_t i, uint8_t bank) {
 		rdiff >>= 1;
 		j++;
 	}
+}
+
+// The bank's interrupt pin: the mcp23017 signals by high (IOCON INTPOL, setup_zynmcp23017)
+#define ZYNMCP23017_ISR_MAX_REREADS 8
+
+// ISR for handling the mcp23017 interrupts
+void zynmcp23017_ISR(uint8_t i, uint8_t bank) {
+	if (i >= MAX_NUM_MCP23017) {
+		fprintf(stderr, "ZynCore->zynmcp23017_ISR(%d, %d): Invalid index!\n", i, bank);
+		return;
+	}
+	if (!zynmcp23017s[i].enabled) return;
+	if (bank > 1) {
+		fprintf(stderr, "ZynCore->zynmcp23017_ISR(%d, %d): Invalid bank!\n", i, bank);
+		return;
+	}
+
+	zynmcp23017_read_bank(i, bank);
+
+	// A pin that changes while the GPIO register is being read (a fast encoder turn) is latched
+	// after the value in flight: the chip keeps its interrupt pin high, with no low phase and so
+	// no new rising edge for this ISR, and every later change queues behind it. Read again while
+	// the pin is still high.
+	uint8_t int_pin = bank == 0 ? zynmcp23017s[i].intA_pin : zynmcp23017s[i].intB_pin;
+	int n = 0;
+	while (digitalRead(int_pin) == HIGH && n < ZYNMCP23017_ISR_MAX_REREADS) {
+		zynmcp23017_read_bank(i, bank);
+		n++;
+	}
+	if (n == ZYNMCP23017_ISR_MAX_REREADS && digitalRead(int_pin) == HIGH)
+		fprintf(stderr, "ZynCore->zynmcp23017_ISR(%d, %d): interrupt pin %d still high after %d reads\n", i, bank, int_pin, n);
 }
 
 //-----------------------------------------------------------------------------
